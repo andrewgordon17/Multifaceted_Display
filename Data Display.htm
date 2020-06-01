@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<!-- saved from url=(0050)file:///C:/Users/Andrew/Downloads/DataDisplay.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+		<meta charset-"utf-8"="">
+		<title>Data Display</title>
+		<script type="text/javascript" src="./Data Display_files/d3.v3.min.js"></script>
+		
+	</head>
+
+	<body>
+		<style>
+			
+			span.inactive{
+	
+				color: white;
+				pointer-events: none;
+				}
+			
+			
+			
+			circle{
+				stroke: black;
+				
+			}
+			circle:hover {
+				fill: yellow;
+
+				stroke-width: 2;
+
+			}
+			.axis path,
+
+			.axis line {
+			fill: none;
+			stroke: black;
+			shape-rendering: crispEdges;
+
+			}
+
+		</style>
+
+	
+<input type="file" id="input">
+
+<button id="readButton" onclick="read()"> Read</button>
+
+		<script type="text/javascript">
+			function read(){
+			var text = document.getElementById("input").files[0];//takes file from input
+			
+			//removes input and read button
+			var elemInput = document.getElementById('input');
+			elemInput.parentNode.removeChild(elemInput);
+			var elemRead = document.getElementById('readButton');
+			elemRead.parentNode.removeChild(elemRead);
+			
+			//creates reader and reads file
+			var reader = new FileReader();
+			reader.readAsText(text);
+			
+				//This function takes a csv and turns it into an array.  It does so pretty crudely, may need an update in future
+			    function csv2array(csvString){
+					var strlines = csvString.split("\n");//splits csv by line
+					var numlines = []
+					for(var i = 0; i<strlines.length; i++){
+						numlines.push(floatify(strlines[i].split(",")));//splits lines by commas and makes numbers not strings
+						}
+					return numlines;	
+				}
+
+			//function called in csv2array to make sure numbers are not read as strings	
+			function floatify(array){
+				var target = []
+				for(var i = 0; i<array.length;i++){
+					if(!isNaN(parseFloat(array[i]))){target[i]=parseFloat(array[i]);}
+					else{target[i] = array[i];}
+				}
+				return target
+			}
+			
+			//function to begin once text is loaded.  Everything is in here.
+			reader.onload = function(e) {
+
+				arrays = csv2array(reader.result);//convert csv to arrays
+				
+				//Settings for graph
+				var width = 1000;//width of image
+				var height = 600;//height of image
+				var margin = {top: 50, left:100, right: 50, bottom: 50};
+				graphAttributes = ["XAxis", "YAxis", "Color", "Size"];
+				var xScale;
+				var yScale;
+				var colorScale;
+				var radScale;
+				var xAxis;
+				var yAxis;
+				
+				//first line of csv  is attributes of data	
+				attributeData = arrays[0];
+				attributeData.push("off");//append "off" option
+				
+				for(var i = 0; i<attributeData.length; i++){attributeData[i] = attributeData[i].replace(/\s/g, "_");}//remove whitespace from names of attributes
+				
+				//create 2d data array (this is just renaming the csv data and cutting off non data lines)
+				var data = arrays.slice(1,arrays.length-1);
+				
+				
+				
+				//Creates interactive text
+				//Creates divs based on graph attributes
+				titles = d3.select("body")
+					.selectAll("div")
+					.data(graphAttributes)
+					.enter()
+					.append("div")
+					.text(function(d){
+						return d.toUpperCase() + ": " ;
+						});
+				
+				//Creates spans in each div based on inputted data aspects
+				
+				var gaTicker=0;//counter to determine graph attribute of a span
+				
+				//create span element with class name of graph feautre and data attribute
+				innerTitles = d3.selectAll("div")
+					.selectAll("span")
+					.data(attributeData)
+					.enter()
+					.append("span")
+					.text(function(d){return " " + d.replace(/\_/g, " ") + " ";})
+					.attr("class", function(d)
+					{
+						ga = Math.floor(gaTicker/attributeData.length);
+						gaTicker+=1;
+						return "TITLE" + graphAttributes[ga] + "TITLE" + " " + d;
+					});
+				
+				
+				//Turns off data aspects that are unclickable
+				
+				//remove option to turn axes off
+				d3.selectAll(".TITLEXAxisTITLE.off").attr("class", "inactive");
+				d3.selectAll(".TITLEYAxisTITLE.off").attr("class", "inactive");
+				
+				//remove option to make size non numeric
+				numeric = [true, true, true, true]
+				for(var i = 4; i<attributeData.length-1; i++){numeric.push(true);}
+
+				for(var i = 0; i<attributeData.length-1; i++){
+
+					for(var j=0; j<data.length; j++){
+						if(isNaN(parseFloat(data[j][i]))){numeric[i] = false}
+					}
+					if(!numeric[i]){d3.selectAll(".TITLESizeTITLE." + attributeData[i]).attr("class", "inactive");}
+				}
+
+					
+				//creates array of initial settings if # data aspects > 4 this is just a diagonal.
+				var adInd=[]
+				adInd[0] = 0;
+				adInd[1] = Math.min(1,attributeData.length-2);
+				adInd[2] = Math.min(2,attributeData.length-2);
+				adInd[3] = (!numeric[3]) ? attributeData.length-1 : Math.min(3,attributeData.length-2) ;
+				
+				
+				//create svg
+				var svg = d3.select("body").append("svg")
+					.attr("width", width)
+					.attr("height", height);
+				
+				
+				//add circles	
+				var circles = svg.selectAll("circle")
+					.data(data)
+					.enter()
+					.append("circle");
+				
+				//initalize circles and add mouseover text
+				circles.attr("cx", width/2)
+					.attr("cy", height/2)
+					.attr("r", 10)
+					.append("title")
+					.text(function(d) {
+						var str = ""
+						for(i=0;i<attributeData.length-1;i++){
+						str+=attributeData[i].replace(/\_/g, " ") + ": " + d[i] + "   ";
+						}
+						return str
+							});
+			
+				//set up circles  Timeout is necessary to prevent threading error
+				
+				//set up X coordinate
+				setTimeout(function(){		
+				setX(adInd[0]);
+				//set up x Axis
+				xAxis = d3.svg.axis()
+					.scale(xScale)
+					.orient("bottom");
+
+				svg.append("g")
+					.attr("class", "xaxis axis")
+					.attr("transform", "translate(0," + (height-margin.bottom)+ ")")
+					.call(xAxis);
+				d3.selectAll(".TITLEXAxisTITLE." + attributeData[adInd[0]]).style("color", "red");//turns title red	
+				},100);
+				
+				
+				//set up Y coordinate
+				setTimeout(function(){
+				setY(adInd[1]);
+				//set up Y axis
+				var yAxis = d3.svg.axis()
+					.scale(yScale)
+					.orient("left");
+				svg.append("g")
+					.attr("class", "yaxis axis")
+					.attr("transform", "translate(" + margin.left + ", 0)")
+					.call(yAxis);
+				d3.selectAll(".TITLEYAxisTITLE." + attributeData[adInd[1]]).style("color", "red");//turns title red	
+				},400);
+				
+				//set up Color
+				setTimeout(function(){
+				setColor(adInd[2]);
+				d3.selectAll(".TITLEColorTITLE." + attributeData[adInd[2]]).style("color", "red");//turns title red	
+				},700);
+				
+				//set up Size
+				setTimeout(function(){
+				setSize(adInd[3]);
+				d3.selectAll(".TITLESizeTITLE." + attributeData[adInd[3]]).style("color", "red");//turns title red	
+				},1000);
+							
+				
+
+				
+
+				//Function called on click for all active titles
+				d3.selectAll("span:not(.inactive)")
+					.on("click", function(){
+						
+						var classArray = d3.select(this).attr("class").split(" ");
+						var feature = classArray[0].substring(5,classArray[0].length-5);//from event determine what feature of graph is selected
+						var aspect = attributeData.indexOf(classArray[1]);//from even determine what aspect of data to use for feature
+
+						//turn selected text red and others black
+						d3.selectAll(".TITLE"+feature+"TITLE")
+							.style("color", "black");
+						d3.select(this).style("color", "red");
+						
+
+						
+						//Case by Case change graph feature to desired data aspect
+						if(feature == "XAxis"){
+								setX(aspect);
+								
+								//adjust X Axis
+								var xAxis = d3.svg.axis()
+									.scale(xScale)
+									.orient("bottom");
+									
+								svg.select(".xaxis")
+									.transition()
+									.call(xAxis);
+						}
+						if(feature == "YAxis"){
+
+								setY(aspect);
+								
+								//adjust Y Axis	
+								var yAxis = d3.svg.axis()
+									.scale(yScale)
+									.orient("left");
+								
+								svg.select(".yaxis")
+									.transition()
+									.call(yAxis);
+							}
+						if(feature == "Color"){
+						
+							setColor(aspect);
+						}
+						if(feature =="Size"){
+							setSize(aspect);
+						}
+					});
+				
+				//Functions to adjust data aspect of points.  These are all called to initialize, and called on clicks
+				//They change the scales that converts data values to Xposition/Yposition/Color/Size then recalculate that data aspect
+	
+				function setX(aspect){
+				
+					if(!numeric[aspect]){
+						dom = vertNoRepList(aspect)
+						dom.push("");
+						dom.unshift("");
+						xScale = d3.scale.ordinal()
+							.domain(dom)
+							.rangePoints([margin.left, width-margin.right]);
+							
+						circles.data(data).transition()
+							.attr("cx", function(d) { return xScale(d[aspect]);});
+							
+												
+					}else{
+						xScale = d3.scale.linear()
+							.domain([d3.min(data, function(d) { return d[aspect];}), d3.max(data, function(d) { return d[aspect];})])
+							.range([margin.left, width-margin.right])
+							.nice();
+
+						circles.data(data).transition()
+							.attr("cx", function(d) { return xScale(d[aspect]);});
+					}
+				}
+				function setY(aspect){
+				
+					if(!numeric[aspect]){
+						dom = vertNoRepList(aspect)
+						dom.push("");
+						dom.unshift("");
+						yScale = d3.scale.ordinal()
+							.domain(dom)
+							.rangePoints([height-margin.bottom, margin.top]);
+							
+						circles.data(data).transition()
+							.attr("cy", function(d) { return yScale(d[aspect]);});
+									
+															
+					}else{
+						yScale = d3.scale.linear()
+							.domain([d3.min(data, function(d) { return d[aspect];}), d3.max(data, function(d) { return d[aspect];})])
+							.range([height-margin.bottom, margin.top])
+							.nice();
+
+						circles.data(data).transition()
+							.attr("cy", function(d) { return yScale(d[aspect]);});
+							
+						}
+					
+					}
+				function setColor(aspect){
+					if(aspect==attributeData.length-1){
+							circles.data(data).transition()
+								.attr("fill", "rgb(0,0,0)");
+							
+					}else if(!numeric[aspect]){
+
+						colorScale = d3.scale.category10();
+						noRepList = vertNoRepList(aspect);
+
+						circles.data(data).transition()
+							.attr("fill", function(d) {return colorScale(noRepList.indexOf(d[aspect]))});
+						}
+						else{
+						
+						colorScale = d3.scale.pow()
+							.domain([d3.max(data, function(d) { return d[aspect];}), d3.min(data, function(d) { return d[aspect];})])
+							.range([0, 255]);
+						
+						circles.data(data).transition()
+							.attr("fill", function(d) {return "rgb(" + (255 - Math.round(colorScale(d[aspect]))) + "," +  Math.round(colorScale(d[aspect])) + "," + Math.round(colorScale(d[aspect])) + ")";});
+						}
+				
+				}
+				function setSize(aspect){
+				if(aspect==attributeData.length-1){
+						circles.data(data).transition()
+							.attr("r", width/100)
+							.attr("fill-opacity", 1);
+						}
+						else{
+						radScale = d3.scale.linear()
+							.domain([d3.min(data, function(d) { return d[aspect];}), d3.max(data, function(d) { return d[aspect];})])
+							.range([width/200, width/20]);
+							
+						circles.data(data)
+							.transition()
+							.attr("r", function(d) { return radScale(d[aspect]);})
+							.attr("fill-opacity", function(d) { return 1-(radScale(d[aspect])/(width/5));});
+						}	
+			}
+			
+			//function to eliminate redundancy from a list.  Used for nonnumeric data aspects
+				function vertNoRepList(colInd){
+					var noRepList = []
+
+					for(var i = 0; i<data.length; i++){
+						if(noRepList.indexOf(data[i][colInd])<0){noRepList.push(data[i][colInd]);}
+					}
+						return noRepList;
+				}
+			
+			
+			}
+			
+		}	
+		</script>
+	
+
+				
+		</body></html>
